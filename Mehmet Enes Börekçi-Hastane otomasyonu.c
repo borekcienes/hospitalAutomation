@@ -1,12 +1,8 @@
-//Her bir seçenek, ilgili fonksiyonu çağırarak hastane otomasyonunda belirli bir işlemi gerçekleştirir. Bu işlevler hasta ekleme, hasta silme, hasta listeleme ve programdan çıkış gibi temel hastane yönetimi görevlerini içerir.
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include <stdio.h>  // stdio.h : Standart giriş/çıkış işlemleri için.
-#include <stdlib.h>  //stdlib.h: Bellek yönetimi ve diğer genel işlemler için.
-#include <string.h> //string.h: Dizgi işlemleri için.
-
-// Kişi yapısı
-typedef struct Kisi //Kisi: Bir kişinin temel bilgilerini içeren yapı.
-{
+typedef struct Kisi {
     char ad[50];
     char soyad[50];
     int yas;
@@ -15,26 +11,42 @@ typedef struct Kisi //Kisi: Bir kişinin temel bilgilerini içeren yapı.
     int acilMi;
 } Kisi;
 
-// Hasta yapısı
-typedef struct Hasta  //Hasta: Hasta bilgilerini ve öncelik puanını içeren yapı.
-{
+typedef struct Bolum {
+    char ad[50];
+    char doktor[50];
+    struct Bolum* next;
+} Bolum;
+
+typedef struct Doktor {
+    char ad[50];
+    char bolum[50];
+    struct Doktor* next;
+} Doktor;
+
+typedef struct Hasta {
     int hastaNo;
     Kisi kisi;
     int oncelikPuani;
+    Bolum* bolum;
+    Doktor* doktor;
     struct Hasta* next;
 } Hasta;
 
-// Hasta Kuyruğu yapısı
-typedef struct HastaKuyruk //    HastaKuyruk: Hasta düğümlerini içeren bir kuyruk yapısı.
-{
+typedef struct HastaListesi {
     Hasta* bas;
     Hasta* son;
     int toplamHastaSayisi;
-} HastaKuyruk;
+} HastaListesi;
 
-// Öncelik puanı hesaplama fonksiyonu
-void oncelikPuaniHesapla(Hasta* hasta) //    Bir hasta düğümünün öncelik puanını hesaplayan fonksiyon.
-{
+typedef struct BolumListesi {
+    Bolum* bas;
+} BolumListesi;
+
+typedef struct DoktorListesi {
+    Doktor* bas;
+} DoktorListesi;
+
+void oncelikPuaniHesapla(Hasta* hasta) {
     hasta->oncelikPuani = 0;
     if (hasta->kisi.engelliMi) {
         hasta->oncelikPuani += 30;
@@ -50,67 +62,64 @@ void oncelikPuaniHesapla(Hasta* hasta) //    Bir hasta düğümünün öncelik p
     }
 }
 
-// Yeni hasta ekleme fonksiyonu
-Hasta* hastaEkle(HastaKuyruk* kuyruk, Kisi yeniKisi) //    Yeni bir hasta ekleyen fonksiyon.
-{
+Hasta* hastaOlustur(Kisi yeniKisi, Bolum* bolum, Doktor* doktor) {
     Hasta* yeniHasta = (Hasta*)malloc(sizeof(Hasta));
-    yeniHasta->hastaNo = kuyruk->toplamHastaSayisi + 1;
+    yeniHasta->hastaNo = -1;
     yeniHasta->kisi = yeniKisi;
     yeniHasta->next = NULL;
     oncelikPuaniHesapla(yeniHasta);
+    yeniHasta->bolum = bolum;
+    yeniHasta->doktor = doktor;
 
-    if (kuyruk->son) {
-        kuyruk->son->next = yeniHasta;
-    } else {
-        kuyruk->bas = yeniHasta;
-    }
-
-    kuyruk->son = yeniHasta;
-    kuyruk->toplamHastaSayisi++;
     return yeniHasta;
 }
 
-// Hasta silme fonksiyonu
-void hastaSil(HastaKuyruk* kuyruk, int hastaNo) //    Belirtilen hasta numarasına sahip hastayı silen fonksiyon.
-{
-    Hasta* current = kuyruk->bas;
-    Hasta* prev = NULL;
+void hastaEkle(HastaListesi* liste, Kisi yeniKisi, Bolum* bolum, Doktor* doktor) {
+    Hasta* yeniHasta = hastaOlustur(yeniKisi, bolum, doktor);
 
-    while (current) {
-        if (current->hastaNo == hastaNo) {
-            if (prev) {
-                prev->next = current->next;
-            } else {
-                kuyruk->bas = current->next;
-            }
-
-            if (!current->next) {
-                kuyruk->son = prev;
-            }
-
-            free(current);
-            kuyruk->toplamHastaSayisi--;
-            return;
-        }
-
-        prev = current;
-        current = current->next;
+    if (liste->bas == NULL) {
+        liste->bas = yeniHasta;
+        liste->son = yeniHasta;
+    } else {
+        liste->son->next = yeniHasta;
+        liste->son = yeniHasta;
     }
+
+    liste->toplamHastaSayisi++;
+    yeniHasta->hastaNo = liste->toplamHastaSayisi;
+
+    printf("Yeni hasta eklendi. Hasta No: %d\n", yeniHasta->hastaNo);
 }
 
-// Hasta listeleme fonksiyonu
-void hastaListele(HastaKuyruk* kuyruk) //    Hasta kuyruğunu listelemek için kullanılan fonksiyon.
-{
-    Hasta* current = kuyruk->bas;
+void hastaCikar(HastaListesi* liste) {
+    if (liste->bas == NULL) {
+        printf("Hasta bulunmuyor.\n");
+        return;
+    }
 
-    if (!current) {
+    Hasta* cikarilan = liste->bas;
+    liste->bas = cikarilan->next;
+
+    if (liste->bas == NULL) {
+        liste->son = NULL;
+    }
+
+    printf("Hasta cikarildi. Hasta No: %d\n", cikarilan->hastaNo);
+    free(cikarilan);
+    liste->toplamHastaSayisi--;
+}
+
+void hastaListele(HastaListesi* liste) {
+    Hasta* current = liste->bas;
+
+    if (current == NULL) {
         printf("Kayitli hasta bulunmuyor.\n");
         return;
     }
 
     printf("######Hasta Listesi######\n");
 
-    while (current) {
+    while (current != NULL) {
         printf("Hasta No: %d\n", current->hastaNo);
         printf("Ad: %s\n", current->kisi.ad);
         printf("Soyad: %s\n", current->kisi.soyad);
@@ -119,10 +128,12 @@ void hastaListele(HastaKuyruk* kuyruk) //    Hasta kuyruğunu listelemek için k
         printf("Hamile Mi? %s\n", current->kisi.hamileMi ? "Evet" : "Hayir");
         printf("Acilden Mi Geldi? %s\n", current->kisi.acilMi ? "Evet" : "Hayir");
         printf("Oncelik Puani: %d\n", current->oncelikPuani);
+        printf("Bolum: %s\n", current->bolum->ad);
+        printf("Doktor: %s\n", current->doktor->ad);
 
         current = current->next;
 
-        if (current) {
+        if (current != NULL) {
             printf("\n");
         }
     }
@@ -130,12 +141,57 @@ void hastaListele(HastaKuyruk* kuyruk) //    Hasta kuyruğunu listelemek için k
     printf("######Hasta Listesi Sonu######\n");
 }
 
-int main() //    Programın ana kontrolü, kullanıcıdan seçim yapmasını bekleyen bir döngü içerir.
-{
-    HastaKuyruk hastaKuyrugu;
-    hastaKuyrugu.bas = NULL;
-    hastaKuyrugu.son = NULL;
-    hastaKuyrugu.toplamHastaSayisi = 0;
+void bolumEkle(BolumListesi* bolumListesi, const char* bolumAdi, const char* doktorAdi) {
+    Bolum* yeniBolum = (Bolum*)malloc(sizeof(Bolum));
+    snprintf(yeniBolum->ad, sizeof(yeniBolum->ad), "%s", bolumAdi);
+    snprintf(yeniBolum->doktor, sizeof(yeniBolum->doktor), "%s", doktorAdi);
+    yeniBolum->next = bolumListesi->bas;
+    bolumListesi->bas = yeniBolum;
+}
+
+void doktorEkle(DoktorListesi* doktorListesi, const char* doktorAdi, const char* bolumAdi) {
+    Doktor* yeniDoktor = (Doktor*)malloc(sizeof(Doktor));
+    snprintf(yeniDoktor->ad, sizeof(yeniDoktor->ad), "%s", doktorAdi);
+    snprintf(yeniDoktor->bolum, sizeof(yeniDoktor->bolum), "%s", bolumAdi);
+    yeniDoktor->next = doktorListesi->bas;
+    doktorListesi->bas = yeniDoktor;
+}
+
+void bolumListele(BolumListesi* bolumListesi) {
+    Bolum* current = bolumListesi->bas;
+
+    if (current == NULL) {
+        printf("Bolum bulunmuyor.\n");
+        return;
+    }
+
+    printf("######Bolum Listesi######\n");
+
+    while (current != NULL) {
+        printf("Bolum Adi: %s\n", current->ad);
+        printf("Doktor Adi: %s\n", current->doktor);
+
+        current = current->next;
+
+        if (current != NULL) {
+            printf("\n");
+        }
+    }
+
+    printf("######Bolum Listesi Sonu######\n");
+}
+
+int main() {
+    HastaListesi hastaListesi;
+    hastaListesi.bas = NULL;
+    hastaListesi.son = NULL;
+    hastaListesi.toplamHastaSayisi = 0;
+
+    BolumListesi bolumListesi;
+    bolumListesi.bas = NULL;
+
+    DoktorListesi doktorListesi;
+    doktorListesi.bas = NULL;
 
     int secim_menu;
 
@@ -144,19 +200,22 @@ int main() //    Programın ana kontrolü, kullanıcıdan seçim yapmasını bek
     while (1) {
         printf("1. Hasta Listesini Listele\n");
         printf("2. Yeni Hasta Ekle\n");
-        printf("3. Hasta Sil\n");
-        printf("4. Cikis\n");
+        printf("3. Hasta Cikar\n");
+        printf("4. Bolum Ekle\n");
+        printf("5. Bolum Listele\n");
+        printf("6. Cikis\n");
 
         printf("Seciminiz : ");
         scanf("%d", &secim_menu);
 
         switch (secim_menu) {
             case 1:
-                hastaListele(&hastaKuyrugu);
+                hastaListele(&hastaListesi);
                 break;
 
             case 2: {
                 Kisi yeniKisi;
+                char bolumAdi[50], doktorAdi[50];
                 printf("Yeni Hasta Bilgileri:\n");
                 printf("Ad: ");
                 scanf("%s", yeniKisi.ad);
@@ -170,16 +229,89 @@ int main() //    Programın ana kontrolü, kullanıcıdan seçim yapmasını bek
                 scanf("%d", &yeniKisi.hamileMi);
                 printf("Acilden Mi Geldi? (1=Evet, 0=Hayir): ");
                 scanf("%d", &yeniKisi.acilMi);
+                printf("Hangi Bolumden Randevu Alacak: ");
+                scanf("%s", bolumAdi);
+                printf("Hangi Doktora Gidecek: ");
+                scanf("%s", doktorAdi);
 
-                Hasta* yeniHasta = hastaEkle(&hastaKuyrugu, yeniKisi);
-                printf("Yeni hasta eklendi. Hasta No: %d\n", yeniHasta->hastaNo);
+                Bolum* bolum = NULL;
+                Bolum* currentBolum = bolumListesi.bas;
+                while (currentBolum != NULL) {
+                    if (strcmp(currentBolum->ad, bolumAdi) == 0) {
+                        bolum = currentBolum;
+                        break;
+                    }
+                    currentBolum = currentBolum->next;
+                }
+
+                if (bolum == NULL) {
+                    printf("Boyle bir bolum bulunamadi. Once bolum eklemelisiniz.\n");
+                } else {
+                    Doktor* doktor = NULL;
+                    Doktor* currentDoktor = doktorListesi.bas;
+                    while (currentDoktor != NULL) {
+                        if (strcmp(currentDoktor->ad, doktorAdi) == 0) {
+                            doktor = currentDoktor;
+                            break;
+                        }
+                        currentDoktor = currentDoktor->next;
+                    }
+
+                    if (doktor == NULL) {
+                        printf("Boyle bir doktor bulunamadi. Once doktor eklemelisiniz.\n");
+                    } else {
+                        hastaEkle(&hastaListesi, yeniKisi, bolum, doktor);
+                    }
+                }
                 break;
             }
 
-            case 3: {
-                int hastaNo;
-                printf("Silinecek Hasta No'yu girin: ");
-                scanf("%d", &hastaNo);
-                hastaSil(&hastaKuyrugu, hastaNo);
-                printf("Hasta silindi.\n");} }}
+            case 3:
+                hastaCikar(&hastaListesi);
+                break;
+
+            case 4: {
+                char bolumAdi[50], doktorAdi[50];
+                printf("Yeni Bolum Bilgileri:\n");
+                printf("Bolum Adi: ");
+                scanf("%s", bolumAdi);
+                printf("Doktor Adi: ");
+                scanf("%s", doktorAdi);
+                bolumEkle(&bolumListesi, bolumAdi, doktorAdi);
+                printf("Yeni bolum eklendi.\n");
+                break;
+            }
+
+            case 5:
+                bolumListele(&bolumListesi);
+                break;
+
+            case 6:
+                printf("Cikis Yaptiniz\n");
+                Hasta* currentHasta = hastaListesi.bas;
+                while (currentHasta != NULL) {
+                    Hasta* tempHasta = currentHasta;
+                    currentHasta = currentHasta->next;
+                    free(tempHasta);
+                }
+
+                Bolum* currentBolum = bolumListesi.bas;
+                while (currentBolum != NULL) {
+                    Bolum* tempBolum = currentBolum;
+                    currentBolum = currentBolum->next;
+                    free(tempBolum);
+                }
+
+                Doktor* currentDoktor = doktorListesi.bas;
+                while (currentDoktor != NULL) {
+                    Doktor* tempDoktor = currentDoktor;
+                    currentDoktor = currentDoktor->next;
+                    free(tempDoktor);
+                }
+                return 0;
+
+            default:
+                printf("Yanlis Secim Yaptiniz!!! Lutfen Tekrar Deneyiniz\n\n");
+        }
+    }
 }
